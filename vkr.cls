@@ -435,7 +435,7 @@
 \addtolength\leftmargin{\labelwidth}
 \renewcommand\theenumi{\@arabic\c@enumi}
 \renewcommand\theenumii{\@arabic\c@enumii}
-\renewcommand\theenumiii{\@roman\c@enumiii}
+\renewcommand\theenumiii{\@arabic\c@enumiii}
 \renewcommand\theenumiv{\@Alph\c@enumiv}
 \newcommand\labelenumi{\theenumi.}
 \newcommand\labelenumii{\theenumi.\theenumii.}
