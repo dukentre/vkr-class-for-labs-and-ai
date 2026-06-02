@@ -1,0 +1,9 @@
+.git
+node_modules
+workspace/projects
+*.aux
+*.dvi
+*.log
+*.out
+*.pdf
+*.toc

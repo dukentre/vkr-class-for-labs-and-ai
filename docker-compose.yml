@@ -1,0 +1,10 @@
+services:
+  swsu-latex-lab:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      SWSU_WORKSPACE: /workspace
+    volumes:
+      - ./workspace:/workspace

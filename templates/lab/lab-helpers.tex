@@ -1,0 +1,38 @@
+% Helpers for short laboratory reports.
+% Do not use \section here: in vkr.cls it starts a new page, while lab reports
+% from examples are written as a continuous document.
+
+\renewcommand{\thefigure}{\arabic{figure}}
+\renewcommand{\thetable}{\arabic{table}}
+
+\newcommand{\labheading}[1]{%
+  \par\noindent\textbf{#1}\par
+}
+
+\newcommand{\labinlineheading}[1]{%
+  \par\noindent\textbf{#1} %
+}
+
+\newcommand{\labgoal}[1]{%
+  \labinlineheading{Цель работы:}#1\par
+}
+
+\newcommand{\labinitialdata}{%
+  \labheading{Исходные данные (вариант \Вариант):}
+}
+
+\newcommand{\labwork}{%
+  \labheading{Ход работы:}
+}
+
+\newcommand{\labconclusion}[1]{%
+  \labinlineheading{Вывод:}#1\par
+}
+
+\newcommand{\labimage}[3][0.92\textwidth]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=#1]{#2}
+    \caption{#3}
+  \end{figure}
+}

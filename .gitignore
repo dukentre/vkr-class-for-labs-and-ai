@@ -5,3 +5,7 @@
 *.log
 *.toc
 *.out
+workspace/projects/
+workspace/*.log
+!workspace/.gitkeep
+node_modules/

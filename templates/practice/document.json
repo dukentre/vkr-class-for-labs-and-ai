@@ -1,0 +1,8 @@
+{
+  "id": "{{id}}",
+  "type": "practice",
+  "title": "{{Тема}}",
+  "entry": "main.tex",
+  "output": "build/main.pdf",
+  "passes": 2
+}

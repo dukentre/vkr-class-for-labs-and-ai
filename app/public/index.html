@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SWSU LaTeX Lab</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">SWSU LaTeX Lab</div>
+      <button class="nav active" data-view="projects">Проекты</button>
+      <button class="nav" data-view="templates">Шаблоны</button>
+      <button class="nav" data-view="builds">Сборки</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1>Проекты</h1>
+          <p>Папки с документами LaTeX, доступные студенту и ИИ-агенту.</p>
+        </div>
+        <button id="refresh" class="secondary">Обновить</button>
+      </header>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Новый проект</h2>
+        </div>
+        <form id="project-form" class="form-grid">
+          <label>ID папки
+            <input name="id" placeholder="piaps-site" required>
+          </label>
+          <label>Название
+            <input name="title" placeholder="ПиАПС: сайт компании" required>
+          </label>
+          <button class="primary" type="submit">Создать проект</button>
+        </form>
+      </section>
+
+      <section class="split">
+        <div class="panel">
+          <div class="panel-title">
+            <h2>Список проектов</h2>
+            <span id="project-count" class="muted">0</span>
+          </div>
+          <div id="projects" class="list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">
+            <h2>Новый документ</h2>
+          </div>
+          <form id="document-form" class="doc-form">
+            <label>Тип
+              <select name="type">
+                <option value="lab">Лабораторная</option>
+                <option value="practice">Практика</option>
+                <option value="course">Курсовая</option>
+              </select>
+            </label>
+            <label>ID папки
+              <input name="id" placeholder="lab-01" required>
+            </label>
+            <label>Название
+              <input name="title" placeholder="Лабораторная работа 1" required>
+            </label>
+            <label>Автор
+              <input name="author" placeholder="И. И. Иванов">
+            </label>
+            <label>Группа
+              <input name="group" placeholder="ПО-92б">
+            </label>
+            <label>Дисциплина
+              <input name="discipline" placeholder="Проектирование и архитектура программных систем">
+            </label>
+            <button class="primary" type="submit">Создать документ</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Документы проекта</h2>
+          <span id="selected-project" class="muted">проект не выбран</span>
+        </div>
+        <div id="documents" class="cards"></div>
+      </section>
+    </main>
+
+    <aside class="preview">
+      <section class="runtime">
+        <div>
+          <strong>Build API</strong>
+          <p id="health">проверяем...</p>
+        </div>
+        <span id="health-badge" class="badge">...</span>
+      </section>
+
+      <section class="panel preview-panel">
+        <div class="panel-title">
+          <h2>PDF</h2>
+          <button id="open-pdf" class="secondary" disabled>Открыть</button>
+        </div>
+        <iframe id="pdf" title="PDF preview"></iframe>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-title">
+          <h2>Лог сборки</h2>
+          <button id="load-log" class="secondary" disabled>Лог</button>
+        </div>
+        <pre id="log">Соберите документ, чтобы увидеть лог.</pre>
+      </section>
+    </aside>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

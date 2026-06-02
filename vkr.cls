@@ -24,6 +24,7 @@
 \newif\ifВКР
 \newif\ifПрактика
 \newif\ifКурсовая
+\newif\ifЛабораторная
 
 \newcommand{\interval}{1.7}
 
@@ -38,7 +39,9 @@
 \pagestyle{empty}       % this is actually already in the kernel
 
 \usepackage{fontspec} % шрифт Times
-\setmainfont{Times New Roman}
+\IfFontExistsTF{Times New Roman}
+  {\setmainfont{Times New Roman}}
+  {\setmainfont{Liberation Serif}}
 
 % Размеры шрифтов
 \newcommand\footnotesize{ % подстрочный размер
@@ -256,6 +259,23 @@
         \addtocounter{tablecnt}{-4}
         \vskip 2em
 }\fi
+\ifЛабораторная{
+  \vfill
+  \large\textbf{Отчёт}\\
+  \normalsize по лабораторной работе №\НомерЛабораторной\\
+  \normalsize по дисциплине «\Дисциплина»\\
+  \normalsize по теме: «\Тема\ifx\ТемаВтораяСтрока\@empty{}\else{ \ТемаВтораяСтрока}\fi»\\
+  \vfill
+  \begin{flushright}
+    \begin{tabular}{l}
+      Выполнил: студент \Группа\\
+      \Автор\\
+      \\
+      Проверила: \ДолжностьПроверяющего\\
+      \Проверил
+    \end{tabular}
+  \end{flushright}
+}\fi
 \ifВКР{
   \normalsize\fillcenter\Тема\\
   \fillcenter\ТемаВтораяСтрока\\
@@ -312,7 +332,7 @@
     \fillcenter{\РуководительПрактУнивер}\newline\footnotesize{фамилия и. о.}&&\underline{\hspace{3cm}\hspace{3cm}}\newline\footnotesize{подпись, дата}\\
   \end{tabular}
 }\fi
-\ifВКР{}\else{
+\ifВКР{}\else{\ifЛабораторная{}\else{
   \vfill
   \begin{xltabular}{\textwidth}{p{4.5cm}>{\centering\arraybackslash}X>{\centering\arraybackslash}X}
     \normalsize Члены комиссии & \lhrulefill{\fill} & \lhrulefill{\fill} \\
@@ -328,11 +348,11 @@
     &\footnotesize{подпись, дата} & \footnotesize{фамилия и. о.}\\
     \restorearstrut
   \end{xltabular}
-}\fi
+}\fi}\fi
 \renewcommand{\baselinestretch}{\interval}
 \vfill
 \begin{center}
-\normalsize{Курск \the\year{} г.}
+\ifЛабораторная{\normalsize{Курск \the\year{}}}\else{\normalsize{Курск \the\year{} г.}}\fi
 \end{center}
   \end{titlepage}
 }
@@ -543,7 +563,7 @@
 \def\fnum@table{\tablename\nobreakspace\thetable}
 \newenvironment{table}
                {
-                 \if@app{\refstepcounter{tablecnt}}{}\fi
+                 \ifx\appendixbegin\@empty{\refstepcounter{tablecnt}}\fi
                  \@float{table}}
 {\end@float}
 

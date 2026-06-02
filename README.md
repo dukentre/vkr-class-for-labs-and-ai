@@ -1,5 +1,103 @@
 
-#### Шаблон ВКР(Курсовой, Отчет по практике) по стандартам ЮЗГУ
+# Шаблон ВКР, курсовой, практики и лабораторных ЮЗГУ
+
+В репозитории лежит исходный LaTeX-класс преподавателя и быстрый MVP
+web-приложения для создания проектов, генерации документов и сборки PDF.
+Оформление остается в `vkr.cls`, `setup.tex` и переменных документа.
+
+## Быстрый запуск
+
+Нужен Docker Desktop.
+
+```bash
+docker compose up --build
+```
+
+После запуска:
+
+- UI: `http://localhost:3000`
+- health endpoint: `http://localhost:3000/api/health`
+- физические проекты: `workspace/projects`
+
+На хосте TeX Live ставить не нужно. В контейнер ставится TeX Live и
+`xelatex` через пакет `texlive-xetex`. Если в контейнере нет Times New Roman,
+класс автоматически использует Liberation Serif; листинги используют Liberation Mono.
+
+## Что умеет MVP
+
+- создавать проект как обычную папку;
+- создавать документы внутри проекта: `course`, `practice`, `lab`;
+- копировать в документ `main.tex`, секции, `vkr.cls`, `setup.tex`, `xltabular.sty`;
+- собирать документ через `POST /api/build`;
+- сохранять PDF в `build/main.pdf`, лог в `build/main.log`;
+- показывать PDF и лог в браузере.
+
+Лабораторные собираются в один проход `xelatex`, курсовая и практика -- в два.
+
+## Структура
+
+```text
+app/                 Node.js API и статический UI
+templates/course/    шаблон курсовой
+templates/practice/  шаблон практики
+templates/lab/       шаблон лабораторной
+docs/                MVP-документация
+docker/              настройки контейнера
+workspace/projects/  создаваемые проекты, не коммитятся
+```
+
+## Workflow для ИИ-агента
+
+1. Агент открывает физическую папку документа:
+   `workspace/projects/<project-id>/documents/<document-id>`.
+2. Если это лабораторная, агент читает `AGENTS.md` в папке документа.
+3. Агент правит `.tex`-файлы и кладет изображения в `images/`.
+4. Агент вызывает:
+
+```http
+POST /api/build
+{
+  "projectId": "<project-id>",
+  "documentId": "<document-id>"
+}
+```
+
+5. PDF появляется в `build/main.pdf`, лог сборки -- в `build/main.log`.
+
+## Лабораторные работы
+
+Шаблон лабораторной сделан по примерам отчетов:
+
+```text
+Титульный лист
+Цель работы
+Исходные данные
+Ход работы
+Вывод
+```
+
+В лабораторных не используется `\tableofcontents` и не используются `\section`,
+потому что в текущем классе `\section` начинает новую страницу, а реальные
+лабораторные идут непрерывным текстом. Подробные правила для агента лежат в
+`templates/lab/AGENTS.md` и копируются в каждую созданную лабораторную.
+
+## API
+
+Основные endpoint'ы:
+
+- `GET /api/projects`
+- `POST /api/projects`
+- `GET /api/projects/:projectId/documents`
+- `POST /api/projects/:projectId/documents`
+- `POST /api/build`
+- `GET /api/projects/:projectId/documents/:documentId/pdf`
+- `GET /api/projects/:projectId/documents/:documentId/log`
+
+Подробнее: `docs/API_MVP.md` и `docs/RUN_MVP.md`.
+
+## Ручная работа с исходным шаблоном
+
+Старый режим через TexStudio тоже остается возможным.
 
 Для работы необходимо установить:
 
