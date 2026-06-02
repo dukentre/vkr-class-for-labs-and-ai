@@ -392,9 +392,8 @@ select:focus {
   line-height: 1.25;
 }
 
-.content-grid {
+.documents-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(360px, 1fr);
   gap: 14px;
 }
 
@@ -407,6 +406,10 @@ select:focus {
 
 .document-form .wide {
   grid-column: 1 / -1;
+}
+
+.document-create .document-form {
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
 }
 
 .document-list {
@@ -732,7 +735,7 @@ pre {
     border-left: 0;
   }
 
-  .content-grid,
+  .documents-layout,
   .files-layout {
     grid-template-columns: 1fr;
   }

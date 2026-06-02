@@ -124,7 +124,7 @@
       </section>
 
       <template v-else>
-        <section v-show="activeTab === 'documents'" class="content-grid">
+        <section v-show="activeTab === 'documents'" class="documents-layout">
           <div class="panel document-create">
             <div class="panel-head">
               <div>
