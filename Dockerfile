@@ -1,7 +1,13 @@
 FROM node:22-bookworm
 
-RUN apt-get update \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources \
+  && echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections \
+  && apt-get update \
   && apt-get install -y --no-install-recommends \
+    cabextract \
+    ca-certificates \
     fontconfig \
     fonts-liberation \
     make \
@@ -9,6 +15,7 @@ RUN apt-get update \
     texlive-lang-cyrillic \
     texlive-latex-extra \
     texlive-xetex \
+    ttf-mscorefonts-installer \
   && rm -rf /var/lib/apt/lists/*
 
 COPY docker/fonts-local.conf /etc/fonts/local.conf

@@ -19,9 +19,11 @@ docker compose up --build
 - health endpoint: `http://localhost:3000/api/health`
 - физические проекты: `workspace/projects`
 
-На хосте TeX Live ставить не нужно. В контейнер ставится TeX Live и
-`xelatex` через пакет `texlive-xetex`. Если в контейнере нет Times New Roman,
-класс автоматически использует Liberation Serif; листинги используют Liberation Mono.
+На хосте TeX Live ставить не нужно. В контейнер ставятся TeX Live, `xelatex`
+через пакет `texlive-xetex` и Microsoft Core Fonts с Times New Roman.
+Основной текст собирается строго Times New Roman; если шрифт не найден, `vkr.cls`
+останавливает сборку с ошибкой. Листинги кода используют Liberation Mono как
+моноширинный шрифт для выравнивания строк.
 
 ## Что умеет MVP
 

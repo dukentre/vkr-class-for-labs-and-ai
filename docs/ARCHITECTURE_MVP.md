@@ -72,7 +72,7 @@ workspace/
 
 - backend: Node.js HTTP server из `app/server.js`;
 - frontend: простой SPA, который ходит в API и показывает PDF;
-- builder: Docker image с TeX Live и Times New Roman-совместимыми шрифтами;
+- builder: Docker image с TeX Live и установленным Times New Roman из Microsoft Core Fonts;
 - volume: `workspace/projects` примонтирован в backend/builder.
 
 ## Поток сборки

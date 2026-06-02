@@ -41,7 +41,7 @@
 \usepackage{fontspec} % шрифт Times
 \IfFontExistsTF{Times New Roman}
   {\setmainfont{Times New Roman}}
-  {\setmainfont{Liberation Serif}}
+  {\ClassError{vkr}{Times New Roman font is required}{Install Times New Roman in the build image or host system.}}
 
 % Размеры шрифтов
 \newcommand\footnotesize{ % подстрочный размер
