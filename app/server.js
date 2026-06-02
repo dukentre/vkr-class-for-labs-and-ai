@@ -13,6 +13,41 @@ const PUBLIC_ROOT = path.join(__dirname, 'public');
 const SUPPORT_FILES = ['vkr.cls', 'setup.tex', 'xltabular.sty'];
 const DOCUMENT_TYPES = new Set(['course', 'practice', 'lab']);
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/;
+const CYRILLIC_TO_LATIN = {
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'e',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'h',
+  ц: 'c',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sch',
+  ъ: '',
+  ы: 'y',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya'
+};
 
 const DEFAULT_VARIABLES = {
   'Дисциплина': 'Проектирование и архитектура программных систем',
@@ -87,7 +122,7 @@ function send(res, status, body, headers = {}) {
   const isBuffer = Buffer.isBuffer(body);
   res.writeHead(status, {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     ...(isBuffer ? {} : { 'Content-Type': 'application/json; charset=utf-8' }),
     ...headers
@@ -105,21 +140,36 @@ function sendText(res, status, text, contentType = 'text/plain; charset=utf-8') 
 
 function assertSafeId(id, label) {
   if (!SAFE_ID.test(String(id || ''))) {
-    const error = new Error(`${label} must match ${SAFE_ID}`);
+    const error = new Error(`${label}: используйте латиницу, цифры, точку, нижнее подчеркивание или дефис, максимум 80 символов`);
     error.status = 400;
     throw error;
   }
   return String(id);
 }
 
+function transliterate(value) {
+  return String(value || '')
+    .split('')
+    .map((char) => CYRILLIC_TO_LATIN[char.toLowerCase()] ?? char)
+    .join('');
+}
+
 function slugify(value, fallback) {
-  const slug = String(value || '')
+  const slug = transliterate(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
   return SAFE_ID.test(slug) ? slug : fallback;
+}
+
+function safeIdFrom(value, fallbackSource, fallbackPrefix) {
+  const requestedId = cleanString(value);
+  if (requestedId && SAFE_ID.test(requestedId)) return requestedId;
+  return assertSafeId(slugify(requestedId || fallbackSource, `${fallbackPrefix}-${Date.now()}`), fallbackPrefix);
 }
 
 function resolveInside(root, ...segments) {
@@ -190,7 +240,7 @@ async function listProjects() {
 async function createProject(body) {
   await ensureWorkspace();
   const title = String(body.title || 'Новый проект').trim();
-  const id = assertSafeId(body.id || slugify(title, `project-${Date.now()}`), 'project id');
+  const id = safeIdFrom(body.id, title, 'project');
   const projectDir = resolveInside(PROJECTS_ROOT, id);
   if (fsSync.existsSync(projectDir)) {
     const error = new Error(`Project "${id}" already exists`);
@@ -258,10 +308,38 @@ async function getProjectDir(projectId) {
   return projectDir;
 }
 
-async function listDocuments(projectId) {
+async function getDocumentsDir(projectId) {
   const projectDir = await getProjectDir(projectId);
   const manifest = await readJson(path.join(projectDir, 'project.json'), { documentsDir: 'documents' });
-  const documentsDir = path.join(projectDir, manifest.documentsDir || 'documents');
+  return resolveInside(projectDir, manifest.documentsDir || 'documents');
+}
+
+async function getDocumentDir(projectId, documentId) {
+  const documentsDir = await getDocumentsDir(projectId);
+  const safeDocumentId = assertSafeId(documentId, 'document id');
+  const documentDir = resolveInside(documentsDir, safeDocumentId);
+  if (!fsSync.existsSync(documentDir)) {
+    const error = new Error(`Document "${safeDocumentId}" not found`);
+    error.status = 404;
+    throw error;
+  }
+  return { documentDir, documentId: safeDocumentId };
+}
+
+async function deleteProject(projectId) {
+  const projectDir = await getProjectDir(projectId);
+  await fs.rm(projectDir, { recursive: true, force: true });
+  return { ok: true, projectId };
+}
+
+async function deleteDocument(projectId, documentId) {
+  const target = await getDocumentDir(projectId, documentId);
+  await fs.rm(target.documentDir, { recursive: true, force: true });
+  return { ok: true, projectId, documentId: target.documentId };
+}
+
+async function listDocuments(projectId) {
+  const documentsDir = await getDocumentsDir(projectId);
   await fs.mkdir(documentsDir, { recursive: true });
   const entries = await fs.readdir(documentsDir, { withFileTypes: true });
   const documents = [];
@@ -317,7 +395,7 @@ async function createDocument(projectId, body) {
     documentsDir: 'documents',
     defaults: {}
   });
-  const documentId = assertSafeId(body.id || slugify(body.title, `${type}-${Date.now()}`), 'document id');
+  const documentId = safeIdFrom(body.id, body.title || type, type);
   const documentTitle = String(body.title || documentId).trim();
   const documentsDir = path.join(projectDir, projectManifest.documentsDir || 'documents');
   const documentDir = resolveInside(documentsDir, documentId);
@@ -401,13 +479,7 @@ async function updateLastBuild(documentDir, lastBuild) {
 async function buildDocument(body) {
   const projectId = assertSafeId(body.projectId, 'project id');
   const documentId = assertSafeId(body.documentId || body.docId, 'document id');
-  const projectDir = await getProjectDir(projectId);
-  const documentDir = resolveInside(path.join(projectDir, 'documents'), documentId);
-  if (!fsSync.existsSync(documentDir)) {
-    const error = new Error(`Document "${documentId}" not found`);
-    error.status = 404;
-    throw error;
-  }
+  const { documentDir } = await getDocumentDir(projectId, documentId);
 
   const buildDir = path.join(documentDir, 'build');
   const logPath = path.join(buildDir, 'main.log');
@@ -453,8 +525,7 @@ async function buildDocument(body) {
 }
 
 async function servePdf(res, projectId, documentId) {
-  const projectDir = await getProjectDir(projectId);
-  const documentDir = resolveInside(path.join(projectDir, 'documents'), assertSafeId(documentId, 'document id'));
+  const { documentDir } = await getDocumentDir(projectId, documentId);
   const pdfPath = path.join(documentDir, 'build', 'main.pdf');
   const buffer = await fs.readFile(pdfPath);
   send(res, 200, buffer, {
@@ -464,8 +535,7 @@ async function servePdf(res, projectId, documentId) {
 }
 
 async function serveLog(res, projectId, documentId) {
-  const projectDir = await getProjectDir(projectId);
-  const documentDir = resolveInside(path.join(projectDir, 'documents'), assertSafeId(documentId, 'document id'));
+  const { documentDir } = await getDocumentDir(projectId, documentId);
   const logPath = path.join(documentDir, 'build', 'main.log');
   const text = await fs.readFile(logPath, 'utf8');
   sendText(res, 200, text);
@@ -521,12 +591,20 @@ async function route(req, res) {
     return send(res, 200, { project: await updateProject(parts[2], await parseBody(req)) });
   }
 
+  if (parts[1] === 'projects' && parts.length === 3 && req.method === 'DELETE') {
+    return send(res, 200, await deleteProject(parts[2]));
+  }
+
   if (parts[1] === 'projects' && parts[3] === 'documents' && parts.length === 4 && req.method === 'GET') {
     return send(res, 200, { documents: await listDocuments(parts[2]) });
   }
 
   if (parts[1] === 'projects' && parts[3] === 'documents' && parts.length === 4 && req.method === 'POST') {
     return send(res, 201, { document: await createDocument(parts[2], await parseBody(req)) });
+  }
+
+  if (parts[1] === 'projects' && parts[3] === 'documents' && parts.length === 5 && req.method === 'DELETE') {
+    return send(res, 200, await deleteDocument(parts[2], parts[4]));
   }
 
   if (parts[1] === 'projects' && parts[3] === 'documents' && parts[5] === 'pdf' && req.method === 'GET') {

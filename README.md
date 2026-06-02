@@ -28,6 +28,7 @@ docker compose up --build
 - создавать проект как обычную папку;
 - хранить в проекте настройки титульника: дисциплина, студент, группа, преподаватель и должность;
 - создавать документы внутри проекта: `course`, `practice`, `lab`;
+- удалять проекты и отдельные документы через UI и API;
 - копировать в документ `main.tex`, секции, `vkr.cls`, `setup.tex`, `xltabular.sty`;
 - собирать документ через `POST /api/build`;
 - сохранять PDF в `build/main.pdf`, лог в `build/main.log`;
@@ -88,8 +89,10 @@ POST /api/build
 
 - `GET /api/projects`
 - `POST /api/projects`
+- `DELETE /api/projects/:projectId`
 - `GET /api/projects/:projectId/documents`
 - `POST /api/projects/:projectId/documents`
+- `DELETE /api/projects/:projectId/documents/:documentId`
 - `POST /api/build`
 - `GET /api/projects/:projectId/documents/:documentId/pdf`
 - `GET /api/projects/:projectId/documents/:documentId/log`

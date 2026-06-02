@@ -199,6 +199,15 @@ select {
   background: white;
 }
 
+.secondary.danger {
+  border-color: #f0b8b2;
+  color: var(--red);
+}
+
+.secondary.danger:hover {
+  background: #fff1f0;
+}
+
 .secondary:disabled,
 .primary:disabled {
   cursor: not-allowed;
@@ -226,6 +235,13 @@ select {
   cursor: pointer;
 }
 
+.project-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .project.active,
 .document.active {
   border-color: #82afe8;
@@ -243,6 +259,8 @@ select {
 
 .doc-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 

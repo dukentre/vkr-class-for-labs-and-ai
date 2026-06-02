@@ -24,10 +24,22 @@ API нужен не только фронтенду, но и ИИ-агенту. 
 ```
 
 Если `discipline` не передана, она берется из `title` проекта.
+Если `id` не передан или передан с кириллицей/пробелами, API нормализует его в безопасный ID папки.
 
 ### `GET /api/projects/:projectId/documents`
 
 Возвращает документы проекта.
+
+### `DELETE /api/projects/:projectId`
+
+Удаляет проект вместе со всеми документами.
+
+```json
+{
+  "ok": true,
+  "projectId": "ai-course-project"
+}
+```
 
 ### `POST /api/projects/:projectId/documents`
 
@@ -46,6 +58,19 @@ API нужен не только фронтенду, но и ИИ-агенту. 
 ```
 
 Студент, группа, дисциплина, должность и ФИО преподавателя наследуются из настроек проекта.
+`id` документа тоже можно не передавать: API сделает безопасный ID из названия документа.
+
+### `DELETE /api/projects/:projectId/documents/:documentId`
+
+Удаляет один документ проекта.
+
+```json
+{
+  "ok": true,
+  "projectId": "ai-course-project",
+  "documentId": "lab-01"
+}
+```
 
 ### `POST /api/build`
 

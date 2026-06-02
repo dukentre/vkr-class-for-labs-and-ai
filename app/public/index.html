@@ -29,8 +29,8 @@
           <h2>Новый проект</h2>
         </div>
         <form id="project-form" class="project-form">
-          <label>ID папки
-            <input name="id" placeholder="piaps-site" required>
+          <label>ID папки (авто)
+            <input name="id" placeholder="arhitektura-ivs" maxlength="80" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}" title="Латиница, цифры, точка, нижнее подчеркивание или дефис">
           </label>
           <label>Название проекта
             <input name="title" placeholder="Архитектура ИВС" required>
@@ -75,8 +75,8 @@
                 <option value="course">Курсовая</option>
               </select>
             </label>
-            <label>ID папки
-              <input name="id" placeholder="lab-01" required>
+            <label>ID папки (авто)
+              <input name="id" placeholder="lab-01" maxlength="80" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}" title="Латиница, цифры, точка, нижнее подчеркивание или дефис">
             </label>
             <label>Название
               <input name="title" placeholder="Лабораторная работа 1" required>

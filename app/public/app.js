@@ -25,6 +25,42 @@ const el = {
   loadLog: document.querySelector('#load-log')
 };
 
+const CYRILLIC_TO_LATIN = {
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'e',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'h',
+  ц: 'c',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sch',
+  ъ: '',
+  ы: 'y',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya'
+};
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
@@ -44,6 +80,25 @@ function showLog(message) {
 
 function formJson(form) {
   return Object.fromEntries(new FormData(form).entries());
+}
+
+function transliterate(value) {
+  return String(value || '')
+    .split('')
+    .map((char) => CYRILLIC_TO_LATIN[char.toLowerCase()] ?? char)
+    .join('');
+}
+
+function slugify(value, fallback = '') {
+  const slug = transliterate(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+  return slug || fallback;
 }
 
 function selectedProject() {
@@ -84,6 +139,36 @@ function bindDisciplinePrefill(form) {
   };
 }
 
+function bindSafeIdPrefill(form, prefix) {
+  const titleInput = form.elements.title;
+  const idInput = form.elements.id;
+  const getPrefix = () => (typeof prefix === 'function' ? prefix() : prefix);
+  let previousGenerated = idInput.value;
+
+  function generatedId() {
+    return slugify(titleInput.value, `${getPrefix()}-${Date.now()}`);
+  }
+
+  titleInput.addEventListener('input', () => {
+    const nextId = generatedId();
+    if (!idInput.value.trim() || idInput.value === previousGenerated) {
+      idInput.value = nextId;
+      previousGenerated = nextId;
+    }
+  });
+
+  idInput.addEventListener('input', () => {
+    idInput.value = slugify(idInput.value);
+    previousGenerated = idInput.value;
+  });
+
+  form.addEventListener('reset', () => {
+    window.setTimeout(() => {
+      previousGenerated = idInput.value;
+    });
+  });
+}
+
 function badge(text, kind = '') {
   return `<span class="badge ${kind}">${text}</span>`;
 }
@@ -97,7 +182,10 @@ function renderProjects() {
 
   el.projects.innerHTML = state.projects.map((project) => `
     <article class="project ${project.id === state.selectedProjectId ? 'active' : ''}" data-project-id="${project.id}">
-      <strong>${project.title}</strong>
+      <div class="project-row">
+        <strong>${project.title}</strong>
+        <button class="secondary danger" data-action="delete-project">Удалить</button>
+      </div>
       <p>${project.documentsCount || 0} документов · ${project.path}</p>
       <p>${projectDefaults(project).studentGroup || 'группа не задана'} · ${projectDefaults(project).teacherTitle || 'должность не задана'} ${projectDefaults(project).teacherName || ''}</p>
     </article>
@@ -105,6 +193,10 @@ function renderProjects() {
 
   for (const item of el.projects.querySelectorAll('.project')) {
     item.addEventListener('click', () => selectProject(item.dataset.projectId));
+    item.querySelector('[data-action="delete-project"]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteProjectById(item.dataset.projectId);
+    });
   }
 }
 
@@ -167,6 +259,7 @@ function renderDocuments() {
         <div class="doc-actions">
           <button class="secondary" data-action="select">Выбрать</button>
           <button class="primary" data-action="build">Собрать</button>
+          <button class="secondary danger" data-action="delete">Удалить</button>
         </div>
       </article>
     `;
@@ -176,6 +269,7 @@ function renderDocuments() {
     const id = item.dataset.documentId;
     item.querySelector('[data-action="select"]').addEventListener('click', () => selectDocument(id));
     item.querySelector('[data-action="build"]').addEventListener('click', () => buildDocument(id));
+    item.querySelector('[data-action="delete"]').addEventListener('click', () => deleteDocumentById(id));
   }
 }
 
@@ -195,6 +289,9 @@ async function loadHealth() {
 async function loadProjects() {
   const payload = await api('/api/projects');
   state.projects = payload.projects;
+  if (state.selectedProjectId && !state.projects.some((project) => project.id === state.selectedProjectId)) {
+    state.selectedProjectId = state.projects[0] ? state.projects[0].id : null;
+  }
   if (!state.selectedProjectId && state.projects.length) {
     state.selectedProjectId = state.projects[0].id;
   }
@@ -206,11 +303,20 @@ async function loadProjects() {
 async function loadDocuments() {
   if (!state.selectedProjectId) {
     state.documents = [];
+    state.selectedDocumentId = null;
     renderDocuments();
     return;
   }
   const payload = await api(`/api/projects/${encodeURIComponent(state.selectedProjectId)}/documents`);
   state.documents = payload.documents;
+  if (state.selectedDocumentId && !state.documents.some((doc) => doc.id === state.selectedDocumentId)) {
+    state.selectedDocumentId = null;
+    state.selectedPdfUrl = null;
+    state.selectedLogUrl = null;
+    el.pdf.removeAttribute('src');
+    el.openPdf.disabled = true;
+    el.loadLog.disabled = true;
+  }
   if (!state.selectedDocumentId && state.documents.length) {
     selectDocument(state.documents[0].id, false);
   }
@@ -265,6 +371,51 @@ async function buildDocument(documentId) {
   }
 }
 
+async function deleteProjectById(projectId) {
+  const project = state.projects.find((item) => item.id === projectId);
+  const name = project ? project.title : projectId;
+  if (!window.confirm(`Удалить проект "${name}" со всеми документами?`)) return;
+  try {
+    await api(`/api/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' });
+    if (state.selectedProjectId === projectId) {
+      state.selectedProjectId = null;
+      state.selectedDocumentId = null;
+      state.selectedPdfUrl = null;
+      state.selectedLogUrl = null;
+      el.pdf.removeAttribute('src');
+      el.openPdf.disabled = true;
+      el.loadLog.disabled = true;
+    }
+    showLog(`Проект удалён: ${projectId}`);
+    await loadProjects();
+  } catch (error) {
+    showLog(error.message);
+  }
+}
+
+async function deleteDocumentById(documentId) {
+  const doc = state.documents.find((item) => item.id === documentId);
+  const name = doc ? doc.title : documentId;
+  if (!window.confirm(`Удалить документ "${name}"?`)) return;
+  try {
+    await api(`/api/projects/${encodeURIComponent(state.selectedProjectId)}/documents/${encodeURIComponent(documentId)}`, {
+      method: 'DELETE'
+    });
+    if (state.selectedDocumentId === documentId) {
+      state.selectedDocumentId = null;
+      state.selectedPdfUrl = null;
+      state.selectedLogUrl = null;
+      el.pdf.removeAttribute('src');
+      el.openPdf.disabled = true;
+      el.loadLog.disabled = true;
+    }
+    showLog(`Документ удалён: ${documentId}`);
+    await loadProjects();
+  } catch (error) {
+    showLog(error.message);
+  }
+}
+
 async function loadSelectedLog() {
   if (!state.selectedLogUrl) return;
   try {
@@ -279,6 +430,7 @@ el.projectForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     const payload = formJson(el.projectForm);
+    payload.id = slugify(payload.id || payload.title, `project-${Date.now()}`);
     payload.discipline = payload.discipline || payload.title;
     const result = await api('/api/projects', {
       method: 'POST',
@@ -317,6 +469,7 @@ el.documentForm.addEventListener('submit', async (event) => {
   if (!state.selectedProjectId) return;
   try {
     const form = formJson(el.documentForm);
+    const id = slugify(form.id || form.title, `${form.type}-${Date.now()}`);
     const variables = {
       'Тема': form.title || undefined,
       'НомерЛабораторной': form.labNumber || undefined,
@@ -326,7 +479,7 @@ el.documentForm.addEventListener('submit', async (event) => {
     const result = await api(`/api/projects/${encodeURIComponent(state.selectedProjectId)}/documents`, {
       method: 'POST',
       body: JSON.stringify({
-        id: form.id,
+        id,
         type: form.type,
         title: form.title,
         variables
@@ -347,6 +500,8 @@ el.openPdf.addEventListener('click', () => {
 });
 el.loadLog.addEventListener('click', loadSelectedLog);
 
+bindSafeIdPrefill(el.projectForm, 'project');
+bindSafeIdPrefill(el.documentForm, () => el.documentForm.elements.type.value || 'doc');
 bindDisciplinePrefill(el.projectForm);
 const syncSettingsDisciplinePrefill = bindDisciplinePrefill(el.projectSettingsForm);
 
