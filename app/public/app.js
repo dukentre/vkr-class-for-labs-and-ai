@@ -4,10 +4,17 @@ const state = {
   selectedProjectId: null,
   selectedDocumentId: null,
   selectedPdfUrl: null,
-  selectedLogUrl: null
+  selectedLogUrl: null,
+  layout: {
+    previewTouched: false
+  }
 };
 
 const el = {
+  app: document.querySelector('.app'),
+  sidebar: document.querySelector('.sidebar'),
+  preview: document.querySelector('.preview'),
+  resizeHandles: document.querySelectorAll('[data-resize]'),
   health: document.querySelector('#health'),
   healthBadge: document.querySelector('#health-badge'),
   projects: document.querySelector('#projects'),
@@ -24,6 +31,8 @@ const el = {
   openPdf: document.querySelector('#open-pdf'),
   loadLog: document.querySelector('#load-log')
 };
+
+const LAYOUT_STORAGE_KEY = 'swsu-latex-layout-v1';
 
 const CYRILLIC_TO_LATIN = {
   а: 'a',
@@ -173,6 +182,110 @@ function badge(text, kind = '') {
   return `<span class="badge ${kind}">${text}</span>`;
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function readLayout() {
+  try {
+    return JSON.parse(localStorage.getItem(LAYOUT_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function writeLayout(nextLayout) {
+  state.layout = { ...state.layout, ...nextLayout };
+  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(state.layout));
+}
+
+function setLayoutWidth(variableName, value) {
+  el.app.style.setProperty(variableName, `${Math.round(value)}px`);
+}
+
+function applySavedLayout() {
+  const saved = readLayout();
+  state.layout = {
+    previewTouched: Boolean(saved.previewTouched),
+    sidebarWidth: saved.sidebarWidth,
+    previewWidth: saved.previewWidth
+  };
+  if (saved.sidebarWidth) {
+    setLayoutWidth('--sidebar-width', clamp(Number(saved.sidebarWidth), 180, 380));
+  }
+  if (saved.previewWidth) {
+    setLayoutWidth('--preview-width', clamp(Number(saved.previewWidth), 360, 920));
+  }
+}
+
+function resetLayoutWidth(part) {
+  if (part === 'sidebar') {
+    el.app.style.removeProperty('--sidebar-width');
+    writeLayout({ sidebarWidth: null });
+    return;
+  }
+  el.app.style.removeProperty('--preview-width');
+  writeLayout({ previewWidth: null, previewTouched: false });
+  setPdfOpen(Boolean(el.pdf.getAttribute('src')));
+}
+
+function setPdfOpen(isOpen) {
+  el.app.classList.toggle('pdf-open', isOpen);
+  if (window.innerWidth <= 1220 || state.layout.previewTouched) return;
+
+  if (isOpen) {
+    const focusedWidth = clamp(window.innerWidth * 0.42, 560, 760);
+    setLayoutWidth('--preview-width', focusedWidth);
+  } else {
+    el.app.style.removeProperty('--preview-width');
+  }
+}
+
+function bindResizers() {
+  for (const handle of el.resizeHandles) {
+    handle.addEventListener('dblclick', () => resetLayoutWidth(handle.dataset.resize));
+    handle.addEventListener('pointerdown', (event) => {
+      if (window.innerWidth <= 1220) return;
+      event.preventDefault();
+      const part = handle.dataset.resize;
+      const startX = event.clientX;
+      const startWidth = part === 'sidebar'
+        ? el.sidebar.getBoundingClientRect().width
+        : el.preview.getBoundingClientRect().width;
+      handle.setPointerCapture(event.pointerId);
+      handle.classList.add('active');
+      el.app.classList.add('is-resizing');
+
+      function onPointerMove(moveEvent) {
+        if (part === 'sidebar') {
+          const nextWidth = clamp(startWidth + moveEvent.clientX - startX, 180, 380);
+          setLayoutWidth('--sidebar-width', nextWidth);
+          writeLayout({ sidebarWidth: Math.round(nextWidth) });
+          return;
+        }
+
+        const maxPreviewWidth = Math.max(360, window.innerWidth - el.sidebar.getBoundingClientRect().width - 540);
+        const nextWidth = clamp(startWidth + startX - moveEvent.clientX, 360, Math.min(980, maxPreviewWidth));
+        setLayoutWidth('--preview-width', nextWidth);
+        writeLayout({ previewWidth: Math.round(nextWidth), previewTouched: true });
+      }
+
+      function onPointerUp(upEvent) {
+        handle.releasePointerCapture(upEvent.pointerId);
+        handle.classList.remove('active');
+        el.app.classList.remove('is-resizing');
+        handle.removeEventListener('pointermove', onPointerMove);
+        handle.removeEventListener('pointerup', onPointerUp);
+        handle.removeEventListener('pointercancel', onPointerUp);
+      }
+
+      handle.addEventListener('pointermove', onPointerMove);
+      handle.addEventListener('pointerup', onPointerUp);
+      handle.addEventListener('pointercancel', onPointerUp);
+    });
+  }
+}
+
 function renderProjects() {
   el.projectCount.textContent = String(state.projects.length);
   if (!state.projects.length) {
@@ -304,6 +417,12 @@ async function loadDocuments() {
   if (!state.selectedProjectId) {
     state.documents = [];
     state.selectedDocumentId = null;
+    state.selectedPdfUrl = null;
+    state.selectedLogUrl = null;
+    el.pdf.removeAttribute('src');
+    setPdfOpen(false);
+    el.openPdf.disabled = true;
+    el.loadLog.disabled = true;
     renderDocuments();
     return;
   }
@@ -314,6 +433,7 @@ async function loadDocuments() {
     state.selectedPdfUrl = null;
     state.selectedLogUrl = null;
     el.pdf.removeAttribute('src');
+    setPdfOpen(false);
     el.openPdf.disabled = true;
     el.loadLog.disabled = true;
   }
@@ -329,6 +449,7 @@ async function selectProject(projectId) {
   state.selectedPdfUrl = null;
   state.selectedLogUrl = null;
   el.pdf.removeAttribute('src');
+  setPdfOpen(false);
   el.openPdf.disabled = true;
   el.loadLog.disabled = true;
   renderProjects();
@@ -346,6 +467,10 @@ function selectDocument(documentId, shouldRender = true) {
   el.loadLog.disabled = false;
   if (doc.lastBuild && doc.lastBuild.ok) {
     el.pdf.src = `${doc.pdfUrl}?t=${Date.now()}`;
+    setPdfOpen(true);
+  } else {
+    el.pdf.removeAttribute('src');
+    setPdfOpen(false);
   }
   if (shouldRender) renderDocuments();
 }
@@ -363,6 +488,7 @@ async function buildDocument(documentId) {
     });
     el.log.textContent = `PDF сохранен:\n${result.pdfPath}\n\nЛог:\n${result.logPath}`;
     el.pdf.src = `${result.pdfUrl}?t=${Date.now()}`;
+    setPdfOpen(true);
   } catch (error) {
     el.log.textContent = error.message;
     await loadSelectedLog();
@@ -383,6 +509,7 @@ async function deleteProjectById(projectId) {
       state.selectedPdfUrl = null;
       state.selectedLogUrl = null;
       el.pdf.removeAttribute('src');
+      setPdfOpen(false);
       el.openPdf.disabled = true;
       el.loadLog.disabled = true;
     }
@@ -406,6 +533,7 @@ async function deleteDocumentById(documentId) {
       state.selectedPdfUrl = null;
       state.selectedLogUrl = null;
       el.pdf.removeAttribute('src');
+      setPdfOpen(false);
       el.openPdf.disabled = true;
       el.loadLog.disabled = true;
     }
@@ -499,11 +627,14 @@ el.openPdf.addEventListener('click', () => {
   if (state.selectedPdfUrl) window.open(state.selectedPdfUrl, '_blank');
 });
 el.loadLog.addEventListener('click', loadSelectedLog);
+window.addEventListener('resize', () => setPdfOpen(Boolean(el.pdf.getAttribute('src'))));
 
 bindSafeIdPrefill(el.projectForm, 'project');
 bindSafeIdPrefill(el.documentForm, () => el.documentForm.elements.type.value || 'doc');
 bindDisciplinePrefill(el.projectForm);
 const syncSettingsDisciplinePrefill = bindDisciplinePrefill(el.projectSettingsForm);
+applySavedLayout();
+bindResizers();
 
 loadHealth();
 loadProjects().catch((error) => {

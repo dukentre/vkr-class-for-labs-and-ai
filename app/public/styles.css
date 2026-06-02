@@ -5,6 +5,7 @@
   --text: #15202b;
   --muted: #667585;
   --blue: #2563eb;
+  --blue-soft: #d8e6ff;
   --green: #16845b;
   --orange: #b45309;
   --red: #b42318;
@@ -30,15 +31,54 @@ select {
 }
 
 .app {
+  --sidebar-width: 220px;
+  --preview-width: 520px;
   display: grid;
-  grid-template-columns: 220px minmax(520px, 1fr) 480px;
+  grid-template-columns: var(--sidebar-width) 8px minmax(460px, 1fr) 8px var(--preview-width);
   min-height: 100vh;
+}
+
+.app.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.app.is-resizing iframe {
+  pointer-events: none;
 }
 
 .sidebar {
   padding: 20px 14px;
   border-right: 1px solid var(--line);
   background: #eef2f6;
+  min-width: 0;
+  overflow: auto;
+}
+
+.resize-handle {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.resize-handle:hover::before,
+.app.is-resizing .resize-handle.active::before {
+  background: #b9c7d6;
+}
+
+.main-preview-handle:hover::before,
+.app.is-resizing .main-preview-handle.active::before {
+  background: #86aef3;
 }
 
 .brand {
@@ -69,6 +109,7 @@ select {
 .main {
   padding: 20px 24px;
   overflow: auto;
+  min-width: 0;
 }
 
 .preview {
@@ -79,6 +120,21 @@ select {
   border-left: 1px solid var(--line);
   background: #fbfcfd;
   min-width: 0;
+  transition: background 150ms ease;
+}
+
+.app.pdf-open .preview {
+  grid-template-rows: auto minmax(520px, 1fr) minmax(140px, 180px);
+  background: #f7faff;
+}
+
+.app.pdf-open .preview-panel {
+  border-color: #8ab4f8;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), var(--shadow);
+}
+
+.app.pdf-open .preview-panel .panel-title h2 {
+  color: #1746a2;
 }
 
 .topbar,
@@ -306,6 +362,11 @@ iframe {
   background: #eef2f6;
 }
 
+.app.pdf-open iframe {
+  min-height: 520px;
+  background: white;
+}
+
 .log-panel {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -327,6 +388,10 @@ pre {
 @media (max-width: 1220px) {
   .app {
     grid-template-columns: 200px 1fr;
+  }
+
+  .resize-handle {
+    display: none;
   }
 
   .preview {
