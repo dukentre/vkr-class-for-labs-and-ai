@@ -15,7 +15,9 @@ const el = {
   selectedProject: document.querySelector('#selected-project'),
   projectCount: document.querySelector('#project-count'),
   projectForm: document.querySelector('#project-form'),
+  projectSettingsForm: document.querySelector('#project-settings-form'),
   documentForm: document.querySelector('#document-form'),
+  settingsProject: document.querySelector('#settings-project'),
   refresh: document.querySelector('#refresh'),
   pdf: document.querySelector('#pdf'),
   log: document.querySelector('#log'),
@@ -44,6 +46,44 @@ function formJson(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
+function selectedProject() {
+  return state.projects.find((item) => item.id === state.selectedProjectId) || null;
+}
+
+function projectDefaults(project) {
+  return project.defaults || {};
+}
+
+function bindDisciplinePrefill(form) {
+  const titleInput = form.elements.title;
+  const disciplineInput = form.elements.discipline;
+  let previousTitle = titleInput.value;
+
+  titleInput.addEventListener('input', () => {
+    const title = titleInput.value;
+    if (!disciplineInput.value.trim() || disciplineInput.value === previousTitle) {
+      disciplineInput.value = title;
+    }
+    previousTitle = title;
+  });
+
+  disciplineInput.addEventListener('input', () => {
+    if (!disciplineInput.value.trim()) {
+      previousTitle = titleInput.value;
+    }
+  });
+
+  form.addEventListener('reset', () => {
+    window.setTimeout(() => {
+      previousTitle = titleInput.value;
+    });
+  });
+
+  return () => {
+    previousTitle = titleInput.value;
+  };
+}
+
 function badge(text, kind = '') {
   return `<span class="badge ${kind}">${text}</span>`;
 }
@@ -59,6 +99,7 @@ function renderProjects() {
     <article class="project ${project.id === state.selectedProjectId ? 'active' : ''}" data-project-id="${project.id}">
       <strong>${project.title}</strong>
       <p>${project.documentsCount || 0} документов · ${project.path}</p>
+      <p>${projectDefaults(project).studentGroup || 'группа не задана'} · ${projectDefaults(project).teacherTitle || 'должность не задана'} ${projectDefaults(project).teacherName || ''}</p>
     </article>
   `).join('');
 
@@ -67,10 +108,42 @@ function renderProjects() {
   }
 }
 
+function fillProjectSettings() {
+  const project = selectedProject();
+  el.settingsProject.textContent = project ? project.id : 'проект не выбран';
+  el.projectSettingsForm.querySelector('button').disabled = !project;
+  for (const input of el.projectSettingsForm.elements) {
+    if (input.name) input.disabled = !project;
+  }
+  if (!project) {
+    el.projectSettingsForm.reset();
+    return;
+  }
+  const defaults = projectDefaults(project);
+  el.projectSettingsForm.elements.title.value = project.title || '';
+  el.projectSettingsForm.elements.discipline.value = defaults.discipline || project.title || '';
+  el.projectSettingsForm.elements.studentName.value = defaults.studentName || '';
+  el.projectSettingsForm.elements.studentGroup.value = defaults.studentGroup || '';
+  el.projectSettingsForm.elements.teacherTitle.value = defaults.teacherTitle || '';
+  el.projectSettingsForm.elements.teacherName.value = defaults.teacherName || '';
+  syncSettingsDisciplinePrefill();
+}
+
+function prefillDocumentForm() {
+  const project = selectedProject();
+  if (!project) return;
+  const type = el.documentForm.elements.type.value;
+  if (!el.documentForm.elements.title.value && type === 'lab') {
+    el.documentForm.elements.title.placeholder = 'Архитектура ЭВМ и система команд';
+  }
+}
+
 function renderDocuments() {
-  const project = state.projects.find((item) => item.id === state.selectedProjectId);
+  const project = selectedProject();
   el.selectedProject.textContent = project ? project.id : 'проект не выбран';
   el.documentForm.querySelector('button').disabled = !project;
+  fillProjectSettings();
+  prefillDocumentForm();
 
   if (!project) {
     el.documents.innerHTML = '<p>Выберите проект, чтобы увидеть документы.</p>';
@@ -126,6 +199,7 @@ async function loadProjects() {
     state.selectedProjectId = state.projects[0].id;
   }
   renderProjects();
+  fillProjectSettings();
   await loadDocuments();
 }
 
@@ -152,6 +226,7 @@ async function selectProject(projectId) {
   el.openPdf.disabled = true;
   el.loadLog.disabled = true;
   renderProjects();
+  fillProjectSettings();
   await loadDocuments();
 }
 
@@ -204,6 +279,7 @@ el.projectForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     const payload = formJson(el.projectForm);
+    payload.discipline = payload.discipline || payload.title;
     const result = await api('/api/projects', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -217,16 +293,34 @@ el.projectForm.addEventListener('submit', async (event) => {
   }
 });
 
+el.projectSettingsForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.selectedProjectId) return;
+  try {
+    const payload = formJson(el.projectSettingsForm);
+    payload.discipline = payload.discipline || payload.title;
+    const result = await api(`/api/projects/${encodeURIComponent(state.selectedProjectId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+    const index = state.projects.findIndex((item) => item.id === state.selectedProjectId);
+    if (index >= 0) state.projects[index] = result.project;
+    showLog(`Настройки проекта сохранены: ${result.project.path}`);
+    await loadProjects();
+  } catch (error) {
+    showLog(error.message);
+  }
+});
+
 el.documentForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!state.selectedProjectId) return;
   try {
     const form = formJson(el.documentForm);
     const variables = {
-      'Автор': form.author || undefined,
-      'Группа': form.group || undefined,
-      'Дисциплина': form.discipline || undefined,
-      'Тема': form.title || undefined
+      'Тема': form.title || undefined,
+      'НомерЛабораторной': form.labNumber || undefined,
+      'Вариант': form.variant || undefined
     };
     Object.keys(variables).forEach((key) => variables[key] === undefined && delete variables[key]);
     const result = await api(`/api/projects/${encodeURIComponent(state.selectedProjectId)}/documents`, {
@@ -252,6 +346,9 @@ el.openPdf.addEventListener('click', () => {
   if (state.selectedPdfUrl) window.open(state.selectedPdfUrl, '_blank');
 });
 el.loadLog.addEventListener('click', loadSelectedLog);
+
+bindDisciplinePrefill(el.projectForm);
+const syncSettingsDisciplinePrefill = bindDisciplinePrefill(el.projectSettingsForm);
 
 loadHealth();
 loadProjects().catch((error) => {

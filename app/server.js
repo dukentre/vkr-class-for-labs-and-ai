@@ -27,7 +27,7 @@ const DEFAULT_VARIABLES = {
   'ДолжнРуководительПрактПредпр': 'руководитель',
   'РуководительПрактУнивер': 'А. А. Чаплыгин',
   'ДолжнРуководительПрактУнивер': 'к.т.н. доцент',
-  'Автор': 'И. И. Иванов',
+  'Автор': 'Фамилия И. О.',
   'АвторРод': 'Иванова И.И.',
   'АвторПолностьюРод': 'Иванова Ивана Ивановича',
   'Шифр': 'хх-хх-хххх',
@@ -43,11 +43,51 @@ const DEFAULT_VARIABLES = {
   'СрокПредоставления': '«13» июня 2023~г.'
 };
 
+const DEFAULT_PROJECT_DEFAULTS = {
+  discipline: '',
+  studentName: '',
+  studentGroup: 'ПО-32з',
+  teacherTitle: 'доцент',
+  teacherName: 'Ефремова И. Н.'
+};
+
+function cleanString(value, fallback = '') {
+  const text = String(value == null ? '' : value).trim();
+  return text || fallback;
+}
+
+function normalizeProjectDefaults(defaults = {}, projectTitle = '') {
+  return {
+    discipline: cleanString(defaults.discipline, projectTitle),
+    studentName: cleanString(defaults.studentName, DEFAULT_PROJECT_DEFAULTS.studentName),
+    studentGroup: cleanString(defaults.studentGroup, DEFAULT_PROJECT_DEFAULTS.studentGroup),
+    teacherTitle: cleanString(defaults.teacherTitle, DEFAULT_PROJECT_DEFAULTS.teacherTitle),
+    teacherName: cleanString(defaults.teacherName, DEFAULT_PROJECT_DEFAULTS.teacherName)
+  };
+}
+
+function projectDefaultsToVariables(defaults, projectTitle) {
+  const normalized = normalizeProjectDefaults(defaults, projectTitle);
+  const variables = {
+    'Дисциплина': normalized.discipline,
+    'Группа': normalized.studentGroup,
+    'Проверил': normalized.teacherName,
+    'ДолжностьПроверяющего': normalized.teacherTitle,
+    'Руководитель': normalized.teacherName,
+    'РуководительПрактУнивер': normalized.teacherName,
+    'ДолжнРуководительПрактУнивер': normalized.teacherTitle
+  };
+  if (normalized.studentName) {
+    variables['Автор'] = normalized.studentName;
+  }
+  return variables;
+}
+
 function send(res, status, body, headers = {}) {
   const isBuffer = Buffer.isBuffer(body);
   res.writeHead(status, {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     ...(isBuffer ? {} : { 'Content-Type': 'application/json; charset=utf-8' }),
     ...headers
@@ -133,8 +173,10 @@ async function listProjects() {
     const manifest = await readJson(path.join(projectDir, 'project.json'), {
       id: entry.name,
       title: entry.name,
-      documentsDir: 'documents'
+      documentsDir: 'documents',
+      defaults: normalizeProjectDefaults({}, entry.name)
     });
+    manifest.defaults = normalizeProjectDefaults(manifest.defaults, manifest.title);
     const documentsDir = path.join(projectDir, manifest.documentsDir || 'documents');
     let documentsCount = 0;
     try {
@@ -159,12 +201,50 @@ async function createProject(body) {
     id,
     title,
     createdAt: new Date().toISOString(),
-    documentsDir: 'documents'
+    documentsDir: 'documents',
+    defaults: normalizeProjectDefaults({
+      discipline: body.discipline,
+      studentName: body.studentName,
+      studentGroup: body.studentGroup,
+      teacherTitle: body.teacherTitle,
+      teacherName: body.teacherName
+    }, title)
   };
   await fs.mkdir(path.join(projectDir, 'documents'), { recursive: true });
   await fs.mkdir(path.join(projectDir, 'shared', 'images'), { recursive: true });
   await writeJson(path.join(projectDir, 'project.json'), manifest);
   return { ...manifest, path: projectDir, documentsCount: 0 };
+}
+
+async function updateProject(projectId, body) {
+  const projectDir = await getProjectDir(projectId);
+  const manifestPath = path.join(projectDir, 'project.json');
+  const current = await readJson(manifestPath, {
+    id: projectId,
+    title: projectId,
+    createdAt: new Date().toISOString(),
+    documentsDir: 'documents',
+    defaults: {}
+  });
+  const title = cleanString(body.title, current.title);
+  const incomingDefaults = body.defaults || body;
+  const manifest = {
+    ...current,
+    title,
+    documentsDir: current.documentsDir || 'documents',
+    defaults: normalizeProjectDefaults({
+      ...current.defaults,
+      discipline: incomingDefaults.discipline,
+      studentName: incomingDefaults.studentName,
+      studentGroup: incomingDefaults.studentGroup,
+      teacherTitle: incomingDefaults.teacherTitle,
+      teacherName: incomingDefaults.teacherName
+    }, title),
+    updatedAt: new Date().toISOString()
+  };
+  await writeJson(manifestPath, manifest);
+  const documents = await listDocuments(projectId);
+  return { ...manifest, path: projectDir, documentsCount: documents.length };
 }
 
 async function getProjectDir(projectId) {
@@ -231,9 +311,15 @@ async function createDocument(projectId, body) {
   }
 
   const projectDir = await getProjectDir(projectId);
+  const projectManifest = await readJson(path.join(projectDir, 'project.json'), {
+    id: projectId,
+    title: projectId,
+    documentsDir: 'documents',
+    defaults: {}
+  });
   const documentId = assertSafeId(body.id || slugify(body.title, `${type}-${Date.now()}`), 'document id');
   const documentTitle = String(body.title || documentId).trim();
-  const documentsDir = path.join(projectDir, 'documents');
+  const documentsDir = path.join(projectDir, projectManifest.documentsDir || 'documents');
   const documentDir = resolveInside(documentsDir, documentId);
   const templateDir = resolveInside(TEMPLATES_ROOT, type);
 
@@ -257,6 +343,7 @@ async function createDocument(projectId, body) {
 
   const variables = {
     ...DEFAULT_VARIABLES,
+    ...projectDefaultsToVariables(projectManifest.defaults, projectManifest.title || projectId),
     ...(body.variables || {}),
     id: documentId,
     type,
@@ -428,6 +515,10 @@ async function route(req, res) {
 
   if (parts[1] === 'projects' && parts.length === 2 && req.method === 'POST') {
     return send(res, 201, { project: await createProject(await parseBody(req)) });
+  }
+
+  if (parts[1] === 'projects' && parts.length === 3 && req.method === 'PATCH') {
+    return send(res, 200, { project: await updateProject(parts[2], await parseBody(req)) });
   }
 
   if (parts[1] === 'projects' && parts[3] === 'documents' && parts.length === 4 && req.method === 'GET') {

@@ -139,11 +139,16 @@ p,
   gap: 14px;
 }
 
-.form-grid {
+.form-grid,
+.project-form {
   display: grid;
-  grid-template-columns: 1fr 1.5fr auto;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
   gap: 10px;
   align-items: end;
+}
+
+.project-form button {
+  grid-column: 1 / -1;
 }
 
 .doc-form {
@@ -317,6 +322,7 @@ pre {
   .app,
   .split,
   .form-grid,
+  .project-form,
   .doc-form {
     grid-template-columns: 1fr;
   }

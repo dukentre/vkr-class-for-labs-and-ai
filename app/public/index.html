@@ -28,12 +28,27 @@
         <div class="panel-title">
           <h2>Новый проект</h2>
         </div>
-        <form id="project-form" class="form-grid">
+        <form id="project-form" class="project-form">
           <label>ID папки
             <input name="id" placeholder="piaps-site" required>
           </label>
-          <label>Название
-            <input name="title" placeholder="ПиАПС: сайт компании" required>
+          <label>Название проекта
+            <input name="title" placeholder="Архитектура ИВС" required>
+          </label>
+          <label>Дисциплина
+            <input name="discipline" placeholder="по умолчанию название проекта">
+          </label>
+          <label>Студент (Фамилия И. О.)
+            <input name="studentName" placeholder="Чаплыгин А. Э.">
+          </label>
+          <label>Группа
+            <input name="studentGroup" placeholder="ПО-32з" value="ПО-32з">
+          </label>
+          <label>Должность преподавателя
+            <input name="teacherTitle" placeholder="доцент" value="доцент">
+          </label>
+          <label>Преподаватель
+            <input name="teacherName" placeholder="Ефремова И. Н." value="Ефремова И. Н.">
           </label>
           <button class="primary" type="submit">Создать проект</button>
         </form>
@@ -66,18 +81,43 @@
             <label>Название
               <input name="title" placeholder="Лабораторная работа 1" required>
             </label>
-            <label>Автор
-              <input name="author" placeholder="И. И. Иванов">
+            <label>№ лабораторной
+              <input name="labNumber" placeholder="1">
             </label>
-            <label>Группа
-              <input name="group" placeholder="ПО-92б">
-            </label>
-            <label>Дисциплина
-              <input name="discipline" placeholder="Проектирование и архитектура программных систем">
+            <label>Вариант
+              <input name="variant" placeholder="7">
             </label>
             <button class="primary" type="submit">Создать документ</button>
           </form>
         </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Настройки проекта</h2>
+          <span id="settings-project" class="muted">проект не выбран</span>
+        </div>
+        <form id="project-settings-form" class="project-form">
+          <label>Название проекта
+            <input name="title" placeholder="Архитектура ИВС" required>
+          </label>
+          <label>Дисциплина
+            <input name="discipline" placeholder="по умолчанию название проекта">
+          </label>
+          <label>Студент (Фамилия И. О.)
+            <input name="studentName" placeholder="Чаплыгин А. Э.">
+          </label>
+          <label>Группа
+            <input name="studentGroup" placeholder="ПО-32з">
+          </label>
+          <label>Должность преподавателя
+            <input name="teacherTitle" placeholder="доцент">
+          </label>
+          <label>Преподаватель
+            <input name="teacherName" placeholder="Ефремова И. Н.">
+          </label>
+          <button class="primary" type="submit">Сохранить настройки</button>
+        </form>
       </section>
 
       <section class="panel">
