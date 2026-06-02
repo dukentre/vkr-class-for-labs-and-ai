@@ -1,9 +1,20 @@
 % Helpers for short laboratory reports.
-% Do not use \section here: in vkr.cls it starts a new page, while lab reports
-% from examples are written as a continuous document.
+% In vkr.cls \section starts a new page. For laboratory reports this is allowed:
+% short reports may stay compact, while larger reports can split chapters by page.
 
 \renewcommand{\thefigure}{\arabic{figure}}
 \renewcommand{\thetable}{\arabic{table}}
+
+\newcounter{labSavedFigure}
+\newcounter{labSavedTable}
+
+\newcommand{\labsection}[1]{%
+  \setcounter{labSavedFigure}{\value{figure}}%
+  \setcounter{labSavedTable}{\value{table}}%
+  \section*{#1}%
+  \setcounter{figure}{\value{labSavedFigure}}%
+  \setcounter{table}{\value{labSavedTable}}%
+}
 
 \newcommand{\labheading}[1]{%
   \par\noindent\textbf{#1}\par
@@ -14,19 +25,21 @@
 }
 
 \newcommand{\labgoal}[1]{%
-  \labinlineheading{Цель работы:}#1\par
+  \labsection{Цель работы}%
+  \noindent #1\par
 }
 
 \newcommand{\labinitialdata}{%
-  \labheading{Исходные данные (вариант \Вариант):}
+  \labsection{Исходные данные (вариант \Вариант)}
 }
 
 \newcommand{\labwork}{%
-  \labheading{Ход работы:}
+  \labsection{Ход работы}
 }
 
 \newcommand{\labconclusion}[1]{%
-  \labinlineheading{Вывод:}#1\par
+  \labsection{Вывод}%
+  \noindent #1\par
 }
 
 \newcommand{\labimage}[3][0.92\textwidth]{%
