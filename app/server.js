@@ -12,6 +12,10 @@ const TEMPLATES_ROOT = path.join(REPO_ROOT, 'templates');
 const PUBLIC_ROOT = path.join(__dirname, 'public');
 const SUPPORT_FILES = ['vkr.cls', 'setup.tex', 'xltabular.sty'];
 const DOCUMENT_TYPES = new Set(['course', 'practice', 'lab']);
+const TEXT_FILE_EXTENSIONS = new Set(['.tex', '.md', '.json', '.bib', '.txt', '.cls', '.sty']);
+const EDITABLE_FILE_EXTENSIONS = new Set(['.tex', '.md', '.json', '.bib', '.txt']);
+const FILE_TREE_SKIP_DIRS = new Set(['.git', 'build', 'node_modules']);
+const MAX_TEXT_FILE_BYTES = 1024 * 1024;
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/;
 const CYRILLIC_TO_LATIN = {
   а: 'a',
@@ -122,7 +126,7 @@ function send(res, status, body, headers = {}) {
   const isBuffer = Buffer.isBuffer(body);
   res.writeHead(status, {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     ...(isBuffer ? {} : { 'Content-Type': 'application/json; charset=utf-8' }),
     ...headers
@@ -312,6 +316,127 @@ async function getDocumentsDir(projectId) {
   const projectDir = await getProjectDir(projectId);
   const manifest = await readJson(path.join(projectDir, 'project.json'), { documentsDir: 'documents' });
   return resolveInside(projectDir, manifest.documentsDir || 'documents');
+}
+
+function normalizeProjectFilePath(value) {
+  const relativePath = String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').trim();
+  if (!relativePath || relativePath.includes('\0')) {
+    const error = new Error('File path is required');
+    error.status = 400;
+    throw error;
+  }
+  return relativePath;
+}
+
+function projectRelativePath(projectDir, targetPath) {
+  return path.relative(projectDir, targetPath).split(path.sep).join('/');
+}
+
+function assertTextFile(targetPath, extensions = TEXT_FILE_EXTENSIONS) {
+  const ext = path.extname(targetPath).toLowerCase();
+  if (!extensions.has(ext)) {
+    const error = new Error(`Unsupported file extension: ${ext || '(none)'}`);
+    error.status = 415;
+    throw error;
+  }
+}
+
+async function listProjectFiles(projectId) {
+  const projectDir = await getProjectDir(projectId);
+  const files = [];
+
+  async function walk(currentDir, relativeDir = '', depth = 0) {
+    if (depth > 8) return;
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    entries.sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+      return a.name.localeCompare(b.name, 'ru');
+    });
+
+    for (const entry of entries) {
+      if (entry.isDirectory() && FILE_TREE_SKIP_DIRS.has(entry.name)) continue;
+      const itemPath = path.join(currentDir, entry.name);
+      const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+
+      if (entry.isDirectory()) {
+        files.push({ type: 'dir', name: entry.name, path: relativePath, depth });
+        await walk(itemPath, relativePath, depth + 1);
+        continue;
+      }
+
+      const ext = path.extname(entry.name).toLowerCase();
+      if (!TEXT_FILE_EXTENSIONS.has(ext)) continue;
+      const stat = await fs.stat(itemPath);
+      files.push({
+        type: 'file',
+        name: entry.name,
+        path: relativePath,
+        depth,
+        size: stat.size,
+        updatedAt: stat.mtime.toISOString(),
+        editable: EDITABLE_FILE_EXTENSIONS.has(ext),
+        readable: true
+      });
+    }
+  }
+
+  await walk(projectDir);
+  return files;
+}
+
+async function readProjectFile(projectId, rawPath) {
+  const projectDir = await getProjectDir(projectId);
+  const relativePath = normalizeProjectFilePath(rawPath);
+  const targetPath = resolveInside(projectDir, relativePath);
+  assertTextFile(targetPath);
+  const stat = await fs.stat(targetPath);
+  if (!stat.isFile()) {
+    const error = new Error('Path is not a file');
+    error.status = 400;
+    throw error;
+  }
+  if (stat.size > MAX_TEXT_FILE_BYTES) {
+    const error = new Error('File is too large for browser editing');
+    error.status = 413;
+    throw error;
+  }
+  return {
+    path: projectRelativePath(projectDir, targetPath),
+    content: await fs.readFile(targetPath, 'utf8'),
+    editable: EDITABLE_FILE_EXTENSIONS.has(path.extname(targetPath).toLowerCase()),
+    size: stat.size,
+    updatedAt: stat.mtime.toISOString()
+  };
+}
+
+async function writeProjectFile(projectId, body) {
+  const projectDir = await getProjectDir(projectId);
+  const relativePath = normalizeProjectFilePath(body.path);
+  const targetPath = resolveInside(projectDir, relativePath);
+  assertTextFile(targetPath, EDITABLE_FILE_EXTENSIONS);
+
+  const stat = await fs.stat(targetPath);
+  if (!stat.isFile()) {
+    const error = new Error('Path is not a file');
+    error.status = 400;
+    throw error;
+  }
+
+  const content = String(body.content ?? '');
+  if (Buffer.byteLength(content, 'utf8') > MAX_TEXT_FILE_BYTES) {
+    const error = new Error('File is too large for browser editing');
+    error.status = 413;
+    throw error;
+  }
+
+  await fs.writeFile(targetPath, content, 'utf8');
+  const nextStat = await fs.stat(targetPath);
+  return {
+    ok: true,
+    path: projectRelativePath(projectDir, targetPath),
+    size: nextStat.size,
+    updatedAt: nextStat.mtime.toISOString()
+  };
 }
 
 async function getDocumentDir(projectId, documentId) {
@@ -593,6 +718,18 @@ async function route(req, res) {
 
   if (parts[1] === 'projects' && parts.length === 3 && req.method === 'DELETE') {
     return send(res, 200, await deleteProject(parts[2]));
+  }
+
+  if (parts[1] === 'projects' && parts[3] === 'files' && parts.length === 4 && req.method === 'GET') {
+    return send(res, 200, { files: await listProjectFiles(parts[2]) });
+  }
+
+  if (parts[1] === 'projects' && parts[3] === 'file' && parts.length === 4 && req.method === 'GET') {
+    return send(res, 200, { file: await readProjectFile(parts[2], url.searchParams.get('path')) });
+  }
+
+  if (parts[1] === 'projects' && parts[3] === 'file' && parts.length === 4 && req.method === 'PUT') {
+    return send(res, 200, { file: await writeProjectFile(parts[2], await parseBody(req)) });
   }
 
   if (parts[1] === 'projects' && parts[3] === 'documents' && parts.length === 4 && req.method === 'GET') {
