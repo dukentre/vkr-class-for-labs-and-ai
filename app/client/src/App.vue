@@ -42,7 +42,7 @@
         </label>
         <label>
           <span>Преподаватель</span>
-          <input v-model="projectForm.teacherName" placeholder="Ефремова И. Н.">
+          <input v-model="projectForm.teacherName" placeholder="Малышев А. В.">
         </label>
         <button class="primary-button full" type="submit" :disabled="busy.project">
           <Loader2 v-if="busy.project" :size="17" class="spin" />
@@ -247,7 +247,7 @@
             </label>
             <label>
               <span>Преподаватель</span>
-              <input v-model="settingsForm.teacherName" placeholder="Ефремова И. Н.">
+              <input v-model="settingsForm.teacherName" placeholder="Малышев А. В.">
             </label>
             <button class="primary-button" type="submit" :disabled="busy.settings">
               <Loader2 v-if="busy.settings" :size="17" class="spin" />
@@ -500,7 +500,7 @@ const projectForm = reactive({
   studentName: '',
   studentGroup: 'ПО-32з',
   teacherTitle: 'доцент',
-  teacherName: 'Ефремова И. Н.'
+  teacherName: 'Малышев А. В.'
 });
 
 const settingsForm = reactive({
@@ -636,7 +636,7 @@ function resetProjectForm() {
     studentName: '',
     studentGroup: 'ПО-32з',
     teacherTitle: 'доцент',
-    teacherName: 'Ефремова И. Н.'
+    teacherName: 'Малышев А. В.'
   });
   previousProjectSlug.value = '';
 }

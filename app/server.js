@@ -73,7 +73,7 @@ const DEFAULT_VARIABLES = {
   'Курс': '4',
   'Группа': 'ПО-92б',
   'Руководитель': 'А. А. Чаплыгин',
-  'Проверил': 'Ефремова И. Н.',
+  'Проверил': 'Малышев А. В.',
   'ДолжностьПроверяющего': 'доцент',
   'Нормоконтроль': 'А. А. Чаплыгин',
   'ЗавКаф': 'А. В. Малышев',
@@ -87,7 +87,7 @@ const DEFAULT_PROJECT_DEFAULTS = {
   studentName: '',
   studentGroup: 'ПО-32з',
   teacherTitle: 'доцент',
-  teacherName: 'Ефремова И. Н.'
+  teacherName: 'Малышев А. В.'
 };
 
 function cleanString(value, fallback = '') {

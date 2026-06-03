@@ -19,7 +19,7 @@ API нужен не только фронтенду, но и ИИ-агенту. 
   "studentName": "Чаплыгин А. Э.",
   "studentGroup": "ПО-32з",
   "teacherTitle": "доцент",
-  "teacherName": "Ефремова И. Н."
+  "teacherName": "Малышев А. В."
 }
 ```
 
